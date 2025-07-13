@@ -1,15 +1,15 @@
 import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import openai
 import PyPDF2 as pdf
 from dotenv import load_dotenv
+from openai import OpenAI  # NEW import
 
 # Load environment variables
 load_dotenv()
 
-# Configure OpenAI API
-openai.api_key = os.getenv('OPENAI_API_KEY')
+# Initialize OpenAI client with API key
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Flask app setup
 app = Flask(__name__)
@@ -26,23 +26,25 @@ Job Description:
 {jd}
 '''
 
-# Function to get response from OpenAI's ChatGPT API
+# Function to get response from OpenAI's ChatGPT API (New SDK)
 def get_chatgpt_response(prompt, model="gpt-3.5-turbo"):
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model=model,
         messages=[{"role": "system", "content": prompt}]
     )
-    return response['choices'][0]['message']['content']
+    return response.choices[0].message.content
 
-# Function to extract text from PDF
+# Function to extract text from uploaded PDF
 def text_in_uploaded_pdf(uploaded_file):
     reader = pdf.PdfReader(uploaded_file)
     text = ''
-    for page in range(len(reader.pages)):
-        text += reader.pages[page].extract_text()
+    for page in reader.pages:
+        page_text = page.extract_text()
+        if page_text:
+            text += page_text
     return text
 
-# Route to handle resume analysis and interview setup
+# API route to handle resume analysis and question generation
 @app.route('/analyze-and-interview', methods=['POST'])
 def analyze_and_interview():
     try:
@@ -70,7 +72,7 @@ def analyze_and_interview():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Route to handle interview responses
+# API route to handle interview response analysis
 @app.route('/interview-response', methods=['POST'])
 def interview_response():
     try:
@@ -103,5 +105,11 @@ def interview_response():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Optional route to show API is live
+@app.route('/', methods=['GET'])
+def home():
+    return "✅ Resume Analyzer API is running!", 200
+
+# Run locally
 if __name__ == "__main__":
     app.run(debug=True)
